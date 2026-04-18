@@ -1,0 +1,30 @@
+# Javaビルド成果物
+target/
+*.class
+*.war
+*.jar
+!**/src/main/**/target/
+
+# IDE設定
+.idea/
+*.iml
+.eclipse/
+.settings/
+.classpath
+.project
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 環境変数・機密情報（絶対に公開しない）
+.env
+*.env.local
+*.env.production
+credentials
+.aws/
+
+# ローカル設定ファイル
+*.local

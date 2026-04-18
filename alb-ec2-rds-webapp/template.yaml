@@ -1,0 +1,470 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ALB + EC2(Tomcat) + RDS + Spring Boot WAR hands-on'
+
+Parameters:
+  EmployeeId:
+    Type: String
+    Default: 'YOUR_ID'
+    Description: Employee ID used as a prefix for resource names
+
+  KeyName:
+    Type: String
+    Default: 'your-keypair-name'
+    Description: Name of an existing EC2 KeyPair
+
+  MyIP:
+    Type: String
+    Default: '0.0.0.0/32'
+    Description: Your IP address to allow SSH access (CIDR format)
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: Master password for RDS MySQL (also stored in SSM Parameter Store)
+
+  TomcatVersion:
+    Type: String
+    Default: '10.1.28'
+    Description: Apache Tomcat version (check https://archive.apache.org/dist/tomcat/tomcat-10/)
+
+  WARBucketName:
+    Type: String
+    Description: S3 bucket name where webapp.war is uploaded (create bucket and upload WAR before stack creation)
+
+Resources:
+
+  # ============================================================
+  # VPC and Network
+  # ============================================================
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-vpc'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-igw'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  IGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-public-subnet-1'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-public-subnet-2'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-private-subnet-1'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-private-subnet-2'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-public-rt'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IGWAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-private-rt'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PublicRouteTable
+        - !Ref PrivateRouteTable
+
+  # ============================================================
+  # IAM
+  # ============================================================
+
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'n${EmployeeId}-webapp-ec2-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
+      Policies:
+        - PolicyName: S3WARReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 's3:GetObject'
+                Resource: !Sub 'arn:aws:s3:::${WARBucketName}/*'
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-ec2-role'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub 'n${EmployeeId}-webapp-ec2-profile'
+      Roles:
+        - !Ref EC2Role
+
+  # ============================================================
+  # Security Groups
+  # ============================================================
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'n${EmployeeId} ALB SG - HTTP:80 from internet'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP from internet
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-alb-sg'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'n${EmployeeId} EC2 Tomcat SG'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
+          Description: Tomcat from ALB SG only
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
+          Description: SSH from my IP
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-ec2-sg'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'n${EmployeeId} RDS MySQL SG'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !GetAtt EC2SecurityGroup.GroupId
+          Description: MySQL from EC2 SG only
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-rds-sg'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  # ============================================================
+  # SSM Parameter Store
+  # NOTE: CloudFormation can only create String type, not SecureString.
+  # ============================================================
+  DBPasswordParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub '/n${EmployeeId}/webapp/db-password'
+      Type: String
+      Value: !Ref DBPassword
+      Description: !Sub 'RDS MySQL master password for n${EmployeeId} webapp hands-on'
+      Tags:
+        Cost: !Ref EmployeeId
+
+  # ============================================================
+  # RDS
+  # ============================================================
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub 'n${EmployeeId} webapp RDS subnet group'
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-rds-subnet-group'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    Properties:
+      DBInstanceIdentifier: !Sub 'n${EmployeeId}-webapp-rds-mysql'
+      DBInstanceClass: db.t3.micro
+      Engine: mysql
+      EngineVersion: '8.0'
+      MasterUsername: admin
+      MasterUserPassword: !Ref DBPassword
+      AllocatedStorage: '20'
+      StorageType: gp2
+      DBName: sampledb
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt RDSSecurityGroup.GroupId
+      MultiAZ: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 0
+      DeleteAutomatedBackups: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-rds-mysql'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  # ============================================================
+  # ALB
+  # ============================================================
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub 'n${EmployeeId}-webapp-tg'
+      Protocol: HTTP
+      Port: 8080
+      VpcId: !Ref VPC
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: '8080'
+      HealthCheckPath: /
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      Targets:
+        - Id: !Ref EC2Instance
+          Port: 8080
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-tg'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub 'n${EmployeeId}-webapp-alb'
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !GetAtt ALBSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-alb'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # ============================================================
+  # EC2 (AP Server with Tomcat + Spring Boot WAR)
+  # ============================================================
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: RDSInstance
+    Properties:
+      ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroupIds:
+        - !GetAtt EC2SecurityGroup.GroupId
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -xe
+          exec > >(tee /var/log/user-data.log) 2>&1
+
+          dnf install -y java-17-amazon-corretto wget
+
+          # Install Tomcat
+          TOMCAT_VERSION="${TomcatVersion}"
+          cd /opt
+          wget -q https://archive.apache.org/dist/tomcat/tomcat-10/v${!TOMCAT_VERSION}/bin/apache-tomcat-${!TOMCAT_VERSION}.tar.gz
+          tar xzf apache-tomcat-${!TOMCAT_VERSION}.tar.gz
+          mv apache-tomcat-${!TOMCAT_VERSION} tomcat
+          chmod +x /opt/tomcat/bin/*.sh
+
+          # Set DB connection env vars for Tomcat via setenv.sh
+          DB_PASSWORD=$(aws ssm get-parameter \
+            --name "/n${EmployeeId}/webapp/db-password" \
+            --query "Parameter.Value" \
+            --output text \
+            --region ${AWS::Region})
+
+          cat > /opt/tomcat/bin/setenv.sh << EOF
+          export DB_HOST=${RDSInstance.Endpoint.Address}
+          export DB_PASSWORD=$DB_PASSWORD
+          EOF
+          chmod +x /opt/tomcat/bin/setenv.sh
+
+          # Download and deploy webapp.war from S3
+          # Remove default ROOT directory so ROOT.war takes precedence
+          rm -rf /opt/tomcat/webapps/ROOT
+          aws s3 cp s3://${WARBucketName}/webapp.war /opt/tomcat/webapps/ROOT.war \
+            --region ${AWS::Region}
+
+          # Start Tomcat (deploys ROOT.war automatically)
+          /opt/tomcat/bin/startup.sh
+      Tags:
+        - Key: Name
+          Value: !Sub 'n${EmployeeId}-webapp-ap-instance'
+        - Key: Cost
+          Value: !Ref EmployeeId
+
+Outputs:
+  ALBEndpoint:
+    Description: ALB DNS name - access via browser
+    Value: !Sub 'http://${ALB.DNSName}'
+
+  EC2PublicIP:
+    Description: EC2 Tomcat server public IP (for SSH/SCP)
+    Value: !GetAtt EC2Instance.PublicIp
+
+  RDSEndpoint:
+    Description: RDS MySQL endpoint hostname
+    Value: !GetAtt RDSInstance.Endpoint.Address
+
+  DBPasswordParamName:
+    Description: SSM Parameter Store path for RDS password
+    Value: !Ref DBPasswordParam
+
+  SSHCommand:
+    Description: SSH command to EC2 AP server
+    Value: !Sub 'ssh -i ~/.ssh/${KeyName}.pem ec2-user@${EC2Instance.PublicIp}'
