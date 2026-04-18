@@ -11,12 +11,12 @@ Tomcat にデプロイして RDS MySQL に JDBC で接続する **本格的なWe
 ```
 インターネット
   ↓ HTTP(80)
-[ALB: nXXXXXX-webapp-alb]
+[ALB: my-webapp-alb]
   ↓ HTTP(8080)
-[EC2: nXXXXXX-webapp-ap-instance]
+[EC2: my-webapp-ap-instance]
   Tomcat + Spring Boot WAR（webapp.war）
   ↓ JDBC(3306)
-[RDS: nXXXXXX-webapp-rds-mysql]  ← MySQL 8.0 / sampledb
+[RDS: my-webapp-rds-mysql]  ← MySQL 8.0 / sampledb
 ```
 
 ## 学ぶこと
