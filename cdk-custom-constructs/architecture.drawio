@@ -1,0 +1,97 @@
+<mxfile host="65bd71144e">
+    <diagram id="cdk-custom-constructs-arch" name="CDK Custom Construct - 3-Tier Architecture">
+        <mxGraphModel dx="1762" dy="978" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="AWS CDK (Python) — カスタム L3 Construct" style="text;html=1;strokeColor=none;fillColor=#FF9900;fontColor=#ffffff;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=13;fontStyle=1;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="12" width="300" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="30" value="ThreeTierWebConstruct" style="strokeDasharray=12 6;strokeColor=#FF9900;strokeWidth=3;fillColor=#FFF8EE;fontStyle=1;fontSize=13;align=left;verticalAlign=top;rounded=1;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="200" width="960" height="635" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="my-cdk2-vpc (10.0.0.0/16)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc;grStroke=0;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#E5F5F8;strokeColor=#00BEF2;fontStyle=1;fontSize=13;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="255" width="920" height="565" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="DBサブネットグループ（CDK が自動生成）" style="strokeDasharray=10 5;strokeColor=#F4A700;strokeWidth=2;fillColor=#FFFDE7;fontStyle=3;fontSize=12;align=left;verticalAlign=top;rounded=1;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="630" width="880" height="178" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="パブリックサブネット [AZ-a]" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_public_subnet;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#EBF5FB;strokeColor=#147EBA;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="390" width="420" height="215" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="パブリックサブネット [AZ-b]" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_public_subnet;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#EBF5FB;strokeColor=#147EBA;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="390" width="450" height="215" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="プライベートサブネット [AZ-a]" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_private_subnet;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#F9F9F9;strokeColor=#147EBA;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="655" width="400" height="138" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="プライベートサブネット [AZ-b]" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_private_subnet;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#F9F9F9;strokeColor=#147EBA;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="525" y="655" width="430" height="138" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="my-cdk2-alb-sg&#xa;HTTP:80（インターネットから）" style="strokeDasharray=8 4;strokeColor=#E64A45;strokeWidth=2;fillColor=none;fontStyle=2;fontSize=11;align=center;verticalAlign=top;rounded=1;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="415" y="268" width="200" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="my-cdk2-ec2-sg&#xa;Tomcat:8080（ALB SGからのみ）" style="strokeDasharray=8 4;strokeColor=#E64A45;strokeWidth=2;fillColor=none;fontStyle=2;fontSize=11;align=center;verticalAlign=top;rounded=1;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="432" width="215" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="my-cdk2-rds-sg&#xa;MySQL:3306（EC2 SGからのみ）" style="strokeDasharray=8 4;strokeColor=#E64A45;strokeWidth=2;fillColor=none;fontStyle=2;fontSize=11;align=center;verticalAlign=top;rounded=1;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="665" width="275" height="118" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="インターネット" style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#232F3E;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.internet_alt2;" parent="1" vertex="1">
+                    <mxGeometry x="490" y="18" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="Internet Gateway&#xa;（CDK が自動生成）" style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#8C4FFF;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.internet_gateway;" parent="1" vertex="1">
+                    <mxGeometry x="490" y="128" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="my-cdk2-alb&#xa;ALB（HTTP:80）&#xa;2AZ: パブリックサブネット a + b" style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#8C4FFF;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.application_load_balancer;" parent="1" vertex="1">
+                    <mxGeometry x="490" y="298" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="my-cdk2-ap-instance&#xa;Tomcat&#xa;(t2.micro / Amazon Linux 2023)" style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#ED7100;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="472" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="my-cdk2-rds-mysql&#xa;MySQL 8.0 / db.t3.micro" style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#2E73B8;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;" parent="1" vertex="1">
+                    <mxGeometry x="228" y="693" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="SSM Parameter Store&#xa;/my/cdk2/db-password" style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#E7157B;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.systems_manager;" parent="1" vertex="1">
+                    <mxGeometry x="1070" y="380" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="EC2 なし&#xa;（ALB の 2AZ 要件用）" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="545" y="450" width="395" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="RDS なし&#xa;（DBサブネットグループの 2AZ 要件用）" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="538" y="690" width="395" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="HTTP:80" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#232F3E;strokeWidth=2;fontSize=11;" parent="1" source="13" target="14" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="22" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#232F3E;strokeWidth=2;" parent="1" source="14" target="15" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="HTTP:8080&#xa;(SG-to-SG)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#232F3E;strokeWidth=2;fontSize=11;" parent="1" source="15" target="16" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="520" y="415"/>
+                            <mxPoint x="260" y="415"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="24" value="MySQL:3306&#xa;(SG-to-SG)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2E73B8;strokeWidth=2;fontSize=11;" parent="1" source="16" target="17" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="aws ssm get-parameter" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeDasharray=6 3;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#E7157B;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="290" y="502" as="sourcePoint"/>
+                        <mxPoint x="1070" y="410" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="620" y="502"/>
+                            <mxPoint x="620" y="410"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="31" value="components/three_tier_web.py" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=3;fontColor=#FF9900;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="800" width="270" height="24" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
