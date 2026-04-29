@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Spring Boot + RDS Item Manager</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #333; border-bottom: 2px solid #e67e22; padding-bottom: 8px; }
+    .info { background: #fef9e7; border: 1px solid #f0c040; padding: 10px 16px; border-radius: 4px; margin-bottom: 24px; font-size: 0.9em; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #f5f5f5; font-weight: bold; }
+    tr:hover td { background: #fafafa; }
+    .add-form { display: flex; gap: 8px; margin-top: 8px; }
+    .add-form input[type=text] { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
+    .btn-add { padding: 8px 20px; background: #e67e22; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
+    .btn-add:hover { background: #d35400; }
+    .btn-delete { padding: 4px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+    .btn-delete:hover { background: #c0392b; }
+    .empty { color: #999; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<h1>Spring Boot + RDS Item Manager</h1>
+
+<div class="info">
+  ALB → EC2(Tomcat) → RDS MySQL の3層構成で動作しています。<br>
+  CDK Pipelines による CI/CD で自動デプロイされた Spring Boot アプリです。
+</div>
+
+<h2>アイテム一覧</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>名前</th>
+      <th>登録日時</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr th:if="${#lists.isEmpty(items)}">
+      <td colspan="4" class="empty">アイテムがありません。下のフォームから追加してください。</td>
+    </tr>
+    <tr th:each="item : ${items}">
+      <td th:text="${item.id}"></td>
+      <td th:text="${item.name}"></td>
+      <td th:text="${#temporals.format(item.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
+      <td>
+        <form th:action="@{/items/delete/{id}(id=${item.id})}" method="post">
+          <button type="submit" class="btn-delete"
+                  onclick="return confirm('削除しますか？')">削除</button>
+        </form>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>アイテムを追加</h2>
+<form th:action="@{/items/add}" method="post" class="add-form">
+  <input type="text" name="name" placeholder="アイテム名を入力" maxlength="100" required>
+  <button type="submit" class="btn-add">追加</button>
+</form>
+
+</body>
+</html>

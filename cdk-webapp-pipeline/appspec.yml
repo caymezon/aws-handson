@@ -1,0 +1,19 @@
+version: 0.0
+os: linux
+files:
+  - source: webapp.war
+    destination: /opt/tomcat/webapps/
+    overwrite: true
+hooks:
+  ApplicationStop:
+    - location: scripts/stop_tomcat.sh
+      timeout: 60
+      runas: root
+  BeforeInstall:
+    - location: scripts/cleanup.sh
+      timeout: 30
+      runas: root
+  AfterInstall:
+    - location: scripts/start_tomcat.sh
+      timeout: 120
+      runas: root
