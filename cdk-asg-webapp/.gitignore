@@ -1,0 +1,19 @@
+# CDK
+cdk.out/
+cdk.context.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Java / Maven
+app/target/
+app/.mvn/
+
+# IDE
+.vscode/
+.idea/
