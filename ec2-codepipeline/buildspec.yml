@@ -1,0 +1,40 @@
+version: 0.2
+
+# CodeBuild ビルド仕様
+# 処理の流れ:
+#   1. CodeArtifact 認証トークンを取得し settings.xml を生成
+#   2. common-lib を CodeArtifact に publish
+#   3. app の WAR をビルド（common-lib を CodeArtifact から取得）
+#   4. CodeDeploy 向けにデプロイパッケージを準備
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+
+  pre_build:
+    commands:
+      - echo "=== CodeArtifact 認証トークン取得 ==="
+      - CODEARTIFACT_TOKEN=$(aws codeartifact get-authorization-token --domain "$DOMAIN" --domain-owner "$DOMAIN_OWNER" --region "$REGION" --query authorizationToken --output text)
+      - CODEARTIFACT_URL=$(aws codeartifact get-repository-endpoint --domain "$DOMAIN" --domain-owner "$DOMAIN_OWNER" --repository "$REPOSITORY" --format maven --region "$REGION" --query repositoryEndpoint --output text)
+      - echo "CodeArtifact URL = $CODEARTIFACT_URL"
+      - mkdir -p ~/.m2
+      - printf '<settings><servers><server><id>codeartifact</id><username>aws</username><password>%s</password></server></servers></settings>' "$CODEARTIFACT_TOKEN" > ~/.m2/settings.xml
+      - echo "Maven settings.xml 生成完了"
+
+  build:
+    commands:
+      - echo "=== common-lib を CodeArtifact に publish ==="
+      - mvn --batch-mode -f common-lib/pom.xml deploy -Dcodeartifact.url="$CODEARTIFACT_URL" || echo "common-utils 1.0.0 はすでに publish 済みのためスキップ"
+      - echo "=== webapp WAR をビルド ==="
+      - mvn --batch-mode -f app/pom.xml package -DskipTests -Dcodeartifact.url="$CODEARTIFACT_URL"
+      - echo "=== デプロイパッケージを準備 ==="
+      - cp app/target/webapp.war webapp.war
+      - echo "ビルド完了"
+
+artifacts:
+  files:
+    - webapp.war
+    - appspec.yml
+    - scripts/**/*
+  discard-paths: no

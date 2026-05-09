@@ -1,0 +1,95 @@
+name: Deploy App to EC2
+
+# ec2-github-actions のアプリコードが変更された時のみ起動する
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ec2-github-actions/app/**'
+
+# OIDC トークンの取得に id-token: write が必要
+permissions:
+  id-token: write
+  contents: read
+  packages: read    # GitHub Packages から common-utils を取得するために必要
+
+env:
+  AWS_REGION: ap-northeast-1
+
+jobs:
+  deploy:
+    name: Build & Deploy to EC2
+    runs-on: ubuntu-latest
+    env:
+      # vars.EMPLOYEE_ID は GitHub リポジトリの Variables に設定する（例: my）
+      PREFIX: ${{ vars.EMPLOYEE_ID }}-ec2app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # OIDC でアクセスキー不要の一時認証トークンを取得する
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # GitHub Packages から common-utils を取得するための認証設定を自動生成する
+      - name: Set up Java with GitHub Packages auth
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      # Maven ビルド（GitHub Packages から common-utils を取得して WAR を生成）
+      - name: Build WAR
+        run: |
+          cd ec2-github-actions/app
+          mvn package -DskipTests --no-transfer-progress
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # デプロイ用 zip を作成して S3 にアップロード
+      # zip 構造: webapp.war / appspec.yml / scripts/
+      - name: Package and upload to S3
+        env:
+          BUCKET: ${{ env.PREFIX }}-deploy-${{ vars.AWS_ACCOUNT_ID }}
+          DEPLOY_KEY: ${{ github.sha }}/deploy.zip
+        run: |
+          mkdir -p /tmp/deploy/scripts
+          cp ec2-github-actions/app/target/webapp.war  /tmp/deploy/webapp.war
+          cp ec2-github-actions/appspec.yml             /tmp/deploy/appspec.yml
+          cp ec2-github-actions/scripts/*.sh            /tmp/deploy/scripts/
+          chmod +x /tmp/deploy/scripts/*.sh
+
+          cd /tmp/deploy
+          zip -r /tmp/deploy.zip .
+
+          aws s3 cp /tmp/deploy.zip s3://${BUCKET}/${DEPLOY_KEY}
+          echo "deploy_key=${DEPLOY_KEY}" >> $GITHUB_ENV
+
+      # CodeDeploy でローリングデプロイ
+      - name: Deploy via CodeDeploy
+        env:
+          BUCKET: ${{ env.PREFIX }}-deploy-${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name      ${PREFIX} \
+            --deployment-group-name ${PREFIX}-dg \
+            --s3-location           bucket=${BUCKET},key=${deploy_key},bundleType=zip \
+            --region                ${AWS_REGION} \
+            --query deploymentId \
+            --output text)
+
+          echo "Deployment ID: ${DEPLOYMENT_ID}"
+          echo "Waiting for deployment to complete..."
+
+          aws deploy wait deployment-successful \
+            --deployment-id ${DEPLOYMENT_ID} \
+            --region        ${AWS_REGION}
+
+          echo "=== Deployment complete! ==="

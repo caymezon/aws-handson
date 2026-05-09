@@ -1,0 +1,658 @@
+﻿AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EC2 + ALB + RDS + CodeCommit + CodeBuild + CodeDeploy + CodeArtifact + CodePipeline
+  Full AWS CI/CD pipeline with all Code services
+
+Parameters:
+  EmployeeId:
+    Type: String
+    Default: "my"
+    Description: Employee ID used as resource name prefix
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Default: "Handson1234!"
+    Description: RDS MySQL master password
+
+  MyIP:
+    Type: String
+    Default: "123.456.78.901/32"
+    Description: Your IP address in CIDR format to allow SSH access (e.g. 123.456.78.901/32)
+
+  TomcatVersion:
+    Type: String
+    Default: "10.1.25"
+    Description: Tomcat version to install
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Basic Settings" }
+        Parameters: [EmployeeId, DBPassword, MyIP, TomcatVersion]
+
+Resources:
+
+  # ============================================================
+  # VPC & Network
+  # ============================================================
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-igw
+
+  IGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-public-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-public-2
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-private-1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.12.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-private-2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IGWAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # ============================================================
+  # Security Groups
+  # ============================================================
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EmployeeId}-cp-alb-sg
+      GroupDescription: ALB SG - HTTP from internet
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-alb-sg
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EmployeeId}-cp-ec2-sg
+      GroupDescription: EC2 SG - port 8080 from ALB only, SSH from MyIP
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
+          Description: SSH from MyIP (use SSM Session Manager if no key pair)
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-ec2-sg
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EmployeeId}-cp-rds-sg
+      GroupDescription: RDS SG - MySQL from EC2 only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cp-rds-sg
+
+  # ============================================================
+  # S3 (CodePipeline artifact store)
+  # ============================================================
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${EmployeeId}-cp-artifacts-${AWS::AccountId}
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+
+  # ============================================================
+  # SSM Parameter Store
+  # ============================================================
+  DBPasswordParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${EmployeeId}/cpapp/db-password
+      Type: String
+      Value: !Ref DBPassword
+
+  DBHostParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${EmployeeId}/cpapp/db-host
+      Type: String
+      Value: !GetAtt DBInstance.Endpoint.Address
+
+  # ============================================================
+  # CodeArtifact (internal Maven repository)
+  # ============================================================
+  CodeArtifactDomain:
+    Type: AWS::CodeArtifact::Domain
+    Properties:
+      DomainName: !Sub ${EmployeeId}-domain
+
+  CodeArtifactRepository:
+    Type: AWS::CodeArtifact::Repository
+    Properties:
+      DomainName: !GetAtt CodeArtifactDomain.Name
+      RepositoryName: !Sub ${EmployeeId}-libs
+      Description: Internal shared library repository
+      # Also acts as a proxy for Maven Central
+      ExternalConnections:
+        - public:maven-central
+
+  # ============================================================
+  # CodeCommit (source repository)
+  # ============================================================
+  CodeCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${EmployeeId}-cpapp
+      RepositoryDescription: Source repository for EC2 + CodePipeline hands-on
+
+  # ============================================================
+  # IAM
+  # ============================================================
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EmployeeId}-cp-instance-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: EC2AppPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub ${ArtifactBucket.Arn}/*
+              - Effect: Allow
+                Action: [ssm:GetParameter, ssm:GetParameters]
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${EmployeeId}/cpapp/*
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: "*"
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${EmployeeId}-cp-instance-profile
+      Roles:
+        - !Ref EC2InstanceRole
+
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EmployeeId}-cp-codedeploy-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EmployeeId}-cp-codebuild-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:GetObjectVersion]
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub ${ArtifactBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - codeartifact:GetAuthorizationToken
+                  - codeartifact:GetRepositoryEndpoint
+                  - codeartifact:ReadFromRepository
+                  - codeartifact:PublishPackageVersion
+                  - codeartifact:PutPackageMetadata
+                Resource: "*"
+              - Effect: Allow
+                Action: sts:GetServiceBearerToken
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    sts:AWSServiceName: codeartifact.amazonaws.com
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: "*"
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EmployeeId}-cp-pipeline-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:GetBucketVersioning]
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub ${ArtifactBucket.Arn}/*
+              - Effect: Allow
+                Action: [codecommit:GetBranch, codecommit:GetCommit, codecommit:UploadArchive, codecommit:GetUploadArchiveStatus]
+                Resource: !GetAtt CodeCommitRepository.Arn
+              - Effect: Allow
+                Action: [codebuild:BatchGetBuilds, codebuild:StartBuild]
+                Resource: !GetAtt CodeBuildProject.Arn
+              - Effect: Allow
+                Action: [codedeploy:CreateDeployment, codedeploy:GetApplication, codedeploy:GetApplicationRevision, codedeploy:GetDeployment, codedeploy:GetDeploymentConfig, codedeploy:RegisterApplicationRevision]
+                Resource: "*"
+
+  # ============================================================
+  # RDS MySQL
+  # ============================================================
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub ${EmployeeId}-cp-db-subnet-group
+      DBSubnetGroupDescription: Private subnets for RDS
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    Properties:
+      DBInstanceIdentifier: !Sub ${EmployeeId}-cp-rds
+      DBName: sampledb
+      Engine: mysql
+      EngineVersion: "8.0"
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      MasterUsername: admin
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      MultiAZ: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+
+  # ============================================================
+  # EC2
+  # ============================================================
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: DBInstance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Sub ${EmployeeId}-cpapp
+        - Key: App
+          Value: !Sub ${EmployeeId}-cpapp
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            set -e
+            exec > /var/log/user-data.log 2>&1
+
+            echo "${EmployeeId}" > /etc/employee_id
+            echo "cpapp" > /etc/app_prefix_suffix
+
+            dnf install -y java-17-amazon-corretto-headless
+
+            useradd -r -m -U -d /opt/tomcat -s /bin/false tomcat
+            cd /tmp
+            wget -q https://archive.apache.org/dist/tomcat/tomcat-10/v${TomcatVersion}/bin/apache-tomcat-${TomcatVersion}.tar.gz
+            tar xzf apache-tomcat-${TomcatVersion}.tar.gz
+            mkdir -p /opt/tomcat
+            mv apache-tomcat-${TomcatVersion} /opt/tomcat/current
+            chown -R tomcat:tomcat /opt/tomcat
+            chmod +x /opt/tomcat/current/bin/*.sh
+
+            cat > /etc/systemd/system/tomcat.service << 'EOF'
+            [Unit]
+            Description=Apache Tomcat 10
+            After=network.target
+
+            [Service]
+            Type=forking
+            User=tomcat
+            Group=tomcat
+            Environment="JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto"
+            Environment="CATALINA_HOME=/opt/tomcat/current"
+            ExecStart=/opt/tomcat/current/bin/startup.sh
+            ExecStop=/opt/tomcat/current/bin/shutdown.sh
+            Restart=on-failure
+            RestartSec=10
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+            systemctl daemon-reload
+            systemctl enable tomcat
+            systemctl start tomcat
+
+            dnf install -y ruby wget
+            cd /home/ec2-user
+            wget -q https://aws-codedeploy-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/install
+            chmod +x ./install
+            ./install auto
+            systemctl enable codedeploy-agent
+            systemctl start codedeploy-agent
+
+            echo "UserData completed successfully"
+
+  # ============================================================
+  # ALB
+  # ============================================================
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${EmployeeId}-cp-alb
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${EmployeeId}-cp-tg
+      VpcId: !Ref VPC
+      Protocol: HTTP
+      Port: 8080
+      TargetType: instance
+      Targets:
+        - Id: !Ref EC2Instance
+          Port: 8080
+      HealthCheckPath: /api/health
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "8080"
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      HealthCheckIntervalSeconds: 15
+      HealthCheckTimeoutSeconds: 5
+      Matcher:
+        HttpCode: "200-404"
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+
+  # ============================================================
+  # CodeDeploy
+  # ============================================================
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub ${EmployeeId}-cpapp
+      ComputePlatform: Server
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub ${EmployeeId}-cpapp-dg
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      DeploymentConfigName: CodeDeployDefault.OneAtATime
+      Ec2TagFilters:
+        - Key: App
+          Value: !Sub ${EmployeeId}-cpapp
+          Type: KEY_AND_VALUE
+      DeploymentStyle:
+        DeploymentType: IN_PLACE
+        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
+
+  # ============================================================
+  # CodeBuild
+  # ============================================================
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EmployeeId}-cpapp-build
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: DOMAIN
+            Value: !GetAtt CodeArtifactDomain.Name
+          - Name: DOMAIN_OWNER
+            Value: !Ref AWS::AccountId
+          - Name: REPOSITORY
+            Value: !GetAtt CodeArtifactRepository.Name
+          - Name: REGION
+            Value: !Ref AWS::Region
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Sub /codebuild/${EmployeeId}-cpapp
+
+  # ============================================================
+  # CodePipeline
+  # ============================================================
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${EmployeeId}-cp-pipeline
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        # Stage 1: Source (fetch code from CodeCommit)
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: "1"
+              Configuration:
+                RepositoryName: !GetAtt CodeCommitRepository.Name
+                BranchName: main
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: SourceOutput
+
+        # Stage 2: Build (run mvn package via CodeBuild)
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: "1"
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+
+        # Stage 3: Deploy (deploy to EC2 via CodeDeploy)
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: "1"
+              Configuration:
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+              InputArtifacts:
+                - Name: BuildOutput
+
+# ============================================================
+# Outputs
+# ============================================================
+Outputs:
+  ALBEndpoint:
+    Value: !Sub http://${ALB.DNSName}
+    Description: Application URL
+
+  CodeCommitCloneUrlHttp:
+    Value: !GetAtt CodeCommitRepository.CloneUrlHttp
+    Description: CodeCommit repository HTTPS clone URL
+
+  CodeArtifactDomainName:
+    Value: !GetAtt CodeArtifactDomain.Name
+    Description: CodeArtifact domain name
+
+  CodeArtifactRepositoryName:
+    Value: !GetAtt CodeArtifactRepository.Name
+    Description: CodeArtifact repository name
+
+  ArtifactBucketName:
+    Value: !Ref ArtifactBucket
+    Description: S3 bucket name for CodePipeline artifacts
+
+  PipelineName:
+    Value: !Ref Pipeline
+    Description: CodePipeline pipeline name
+

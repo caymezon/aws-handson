@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>common-utils</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>common-utils</name>
+  <description>共通ユーティリティライブラリ（AWS CodeArtifact 公開用）</description>
+
+  <properties>
+    <java.version>17</java.version>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <!--
+    CodeArtifact への publish 先。
+    ドメイン・オーナー・リポジトリ名は buildspec.yml で動的に生成した settings.xml で上書きされる。
+    ローカルから publish する場合は手順書の指示に従うこと。
+  -->
+  <distributionManagement>
+    <repository>
+      <id>codeartifact</id>
+      <name>CodeArtifact</name>
+      <url>${codeartifact.url}</url>
+    </repository>
+  </distributionManagement>
+
+</project>

@@ -1,0 +1,39 @@
+name: Publish common-utils to GitHub Packages
+
+# ec2-github-actions/common-lib が変更されたときのみ起動
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ec2-github-actions/common-lib/**'
+
+permissions:
+  contents: read
+  packages: write   # GitHub Packages への publish に必要
+
+jobs:
+  publish:
+    name: Publish common-utils
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # actions/setup-java の server-id を使って settings.xml を自動生成する。
+      # server-id: github → pom.xml の <distributionManagement><repository><id>github</id> と一致させる。
+      - name: Set up Java with GitHub Packages auth
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Publish to GitHub Packages
+        run: |
+          cd ec2-github-actions/common-lib
+          mvn deploy --no-transfer-progress
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
