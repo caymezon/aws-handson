@@ -1,0 +1,109 @@
+name: Deploy App to ECS
+
+# cdk-ecs-webapp のアプリコードまたは Dockerfile が変更された時のみ起動する。
+# CDK インフラ（stacks/ components/ 等）の変更は CDK Pipelines が担当する。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cdk-ecs-webapp/app/**'
+      - 'cdk-ecs-webapp/Dockerfile'
+
+# OIDC トークンの取得に id-token: write が必要
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+
+jobs:
+  deploy:
+    name: Build & Deploy to ECS
+    runs-on: ubuntu-latest
+    env:
+      # vars.EMPLOYEE_ID は GitHub リポジトリの Variables に設定する（例: my）
+      PREFIX: ${{ vars.EMPLOYEE_ID }}-cdk6
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # OIDC でアクセスキー不要の一時認証トークンを取得する
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # vars.AWS_ROLE_ARN は GitHub リポジトリの Variables に設定する
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # docker build（Maven → WAR → Tomcat コンテナ）して ECR にプッシュ
+      # IMAGE_TAG に git の SHA を使うことで、どのコミットのイメージか追跡できる
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd cdk-ecs-webapp
+          docker build \
+            -t $ECR_REGISTRY/${PREFIX}-app:$IMAGE_TAG \
+            -t $ECR_REGISTRY/${PREFIX}-app:latest \
+            .
+          docker push $ECR_REGISTRY/${PREFIX}-app:$IMAGE_TAG
+          docker push $ECR_REGISTRY/${PREFIX}-app:latest
+
+      # 現行タスク定義のコンテナイメージを新しい ECR イメージに差し替えて新リビジョンを登録する
+      - name: Update ECS task definition
+        id: update-taskdef
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          export CONTAINER_NAME="${PREFIX}-app"
+          export NEW_IMAGE="$ECR_REGISTRY/${PREFIX}-app:$IMAGE_TAG"
+
+          aws ecs describe-task-definition \
+            --task-definition ${PREFIX}-task \
+            --region $AWS_REGION \
+            --query taskDefinition > /tmp/td.json
+
+          python3 - << 'PYEOF'
+          import json, os
+          td = json.load(open('/tmp/td.json'))
+          for k in ['taskDefinitionArn','revision','status','requiresAttributes',
+                    'compatibilities','registeredAt','registeredBy']:
+              td.pop(k, None)
+          for c in td['containerDefinitions']:
+              if c['name'] == os.environ['CONTAINER_NAME']:
+                  c['image'] = os.environ['NEW_IMAGE']
+                  print(f"Updated image: {c['image']}")
+          json.dump(td, open('/tmp/new_td.json', 'w'))
+          PYEOF
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/new_td.json \
+            --region $AWS_REGION \
+            --query taskDefinition.taskDefinitionArn \
+            --output text)
+          echo "New task definition: $NEW_ARN"
+          echo "new_task_def_arn=$NEW_ARN" >> $GITHUB_OUTPUT
+
+      # ECS サービスを新しいタスク定義でローリングデプロイして安定化を待つ
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${PREFIX}-cluster \
+            --service ${PREFIX}-service \
+            --task-definition ${{ steps.update-taskdef.outputs.new_task_def_arn }} \
+            --region $AWS_REGION
+
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${PREFIX}-cluster \
+            --services ${PREFIX}-service \
+            --region $AWS_REGION
+          echo "Deployment complete!"
