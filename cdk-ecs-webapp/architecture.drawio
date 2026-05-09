@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1212" dy="978" grid="1" gridSize="10" guides="1"
+  tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1"
+  pageWidth="1169" pageHeight="827" math="0" shadow="0">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <!-- ===== 1. VPC background ===== -->
+    <mxCell id="vpc" value="VPC"
+      style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc;verticalLabelPosition=top;verticalAlign=bottom;fontStyle=1;fontSize=12;fillColor=#E5F5F8;strokeColor=#00BEF2;"
+      vertex="1" parent="1">
+      <mxGeometry x="40" y="245" width="790" height="550" as="geometry"/>
+    </mxCell>
+
+    <!-- ===== 2. DB Subnet Group ===== -->
+    <mxCell id="db_subnet_group" value="DB Subnet Group"
+      style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F4A700;strokeWidth=2;strokeDasharray=8 4;fontSize=11;verticalAlign=top;align=center;"
+      vertex="1" parent="1">
+      <mxGeometry x="498" y="548" width="168" height="178" as="geometry"/>
+    </mxCell>
+
+    <!-- ===== 3. Subnets ===== -->
+    <mxCell id="public_subnet" value="Public Subnet"
+      style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_public_subnet;verticalLabelPosition=top;verticalAlign=bottom;fontStyle=1;fontSize=12;fillColor=#EBF5FB;strokeColor=#147EBA;"
+      vertex="1" parent="1">
+      <mxGeometry x="70" y="295" width="730" height="200" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="private_subnet" value="Private Subnet"
+      style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_private_subnet;verticalLabelPosition=top;verticalAlign=bottom;fontStyle=1;fontSize=12;fillColor=#F9F9F9;strokeColor=#147EBA;"
+      vertex="1" parent="1">
+      <mxGeometry x="70" y="525" width="730" height="245" as="geometry"/>
+    </mxCell>
+
+    <!-- ===== 4. Security Groups ===== -->
+    <mxCell id="alb_sg" value="SG: ALB"
+      style="strokeDasharray=8 4;strokeColor=#E64A45;strokeWidth=2;fillColor=none;fontStyle=2;fontSize=11;align=center;verticalAlign=top;rounded=1;html=1;"
+      vertex="1" parent="1">
+      <mxGeometry x="278" y="315" width="108" height="148" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="ecs_sg" value="SG: ECS Task"
+      style="strokeDasharray=8 4;strokeColor=#E64A45;strokeWidth=2;fillColor=none;fontStyle=2;fontSize=11;align=center;verticalAlign=top;rounded=1;html=1;"
+      vertex="1" parent="1">
+      <mxGeometry x="278" y="548" width="108" height="148" as="geometry"/>
+    </mxCell>
+
+    <!-- ===== 5. AWS Resource Icons ===== -->
+
+    <!-- Internet -->
+    <mxCell id="internet" value="Internet"
+      style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#232F3E;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.internet_alt2;"
+      vertex="1" parent="1">
+      <mxGeometry x="568" y="165" width="60" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- IGW -->
+    <mxCell id="igw" value="Internet Gateway"
+      style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#8C4FFF;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.internet_gateway;"
+      vertex="1" parent="1">
+      <mxGeometry x="108" y="340" width="60" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- ALB -->
+    <mxCell id="alb" value="ALB"
+      style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#8C4FFF;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.application_load_balancer;"
+      vertex="1" parent="1">
+      <mxGeometry x="293" y="340" width="60" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- ECS Fargate -->
+    <mxCell id="ecs" value="ECS Fargate&#xa;Tomcat + Spring Boot"
+      style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#ED7100;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ecs;"
+      vertex="1" parent="1">
+      <mxGeometry x="293" y="568" width="60" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- RDS -->
+    <mxCell id="rds" value="RDS MySQL 8.0"
+      style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#2E73B8;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;"
+      vertex="1" parent="1">
+      <mxGeometry x="523" y="578" width="60" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- ECR (outside VPC, right) -->
+    <mxCell id="ecr" value="ECR&#xa;(Docker Image)"
+      style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#ED7100;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ecr;"
+      vertex="1" parent="1">
+      <mxGeometry x="910" y="310" width="60" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- SSM (outside VPC, right) -->
+    <mxCell id="ssm" value="SSM Parameter Store&#xa;(DB credentials)"
+      style="outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#E7157B;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.systems_manager;"
+      vertex="1" parent="1">
+      <mxGeometry x="910" y="520" width="60" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- ===== 6. Pipeline boxes ===== -->
+
+    <!-- CDK Pipelines (infra) -->
+    <mxCell id="cdk_pipeline" value="&lt;b&gt;CDK Pipelines: my-cdk6-pipeline&lt;/b&gt;&#xa;① Source:      GitHub (push で常時起動)&#xa;② Build(Synth): CodeBuild — cdk synth&#xa;③ Mutate:      パイプライン自己更新&#xa;④ InfraDeploy: CloudFormation — VPC / ECR / ECS / RDS / ALB"
+      style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBE5;strokeColor=#C7131F;strokeWidth=2;fontSize=10;align=left;verticalAlign=middle;"
+      vertex="1" parent="1">
+      <mxGeometry x="20" y="20" width="360" height="115" as="geometry"/>
+    </mxCell>
+
+    <!-- GitHub Actions (app) -->
+    <mxCell id="gh_actions" value="&lt;b&gt;GitHub Actions: Deploy App to ECS&lt;/b&gt;&#xa;① push (app/ または Dockerfile 変更時のみ)&#xa;② Docker build (Maven → WAR → Tomcat コンテナ)&#xa;③ ECR にプッシュ&#xa;④ ECS サービスをローリングデプロイ"
+      style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F8E8;strokeColor=#2D8A2D;strokeWidth=2;fontSize=10;align=left;verticalAlign=middle;"
+      vertex="1" parent="1">
+      <mxGeometry x="400" y="20" width="360" height="115" as="geometry"/>
+    </mxCell>
+
+    <!-- ===== 7. Arrows (last = front) ===== -->
+
+    <!-- Internet → IGW -->
+    <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#232F3E;strokeWidth=2;fontSize=10;" edge="1" source="internet" target="igw" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- IGW → ALB -->
+    <mxCell id="e2" value="HTTP :80" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#232F3E;strokeWidth=2;fontSize=10;" edge="1" source="igw" target="alb" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ALB → ECS -->
+    <mxCell id="e3" value=":8080" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#232F3E;strokeWidth=2;fontSize=10;" edge="1" source="alb" target="ecs" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ECS → RDS -->
+    <mxCell id="e4" value="MySQL :3306" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2E73B8;strokeWidth=2;fontSize=10;" edge="1" source="ecs" target="rds" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- GitHub Actions → ECR (docker push) -->
+    <mxCell id="e5" value="docker push" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ED7100;strokeWidth=2;fontSize=10;dashed=1;strokeDasharray=6 3;" edge="1" source="gh_actions" target="ecr" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- GitHub Actions → ECS (rolling deploy) -->
+    <mxCell id="e6" value="update service" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#C7131F;strokeWidth=2;fontSize=10;dashed=1;strokeDasharray=6 3;" edge="1" source="gh_actions" target="ecs" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- CDK Pipelines → VPC (deploy infra) -->
+    <mxCell id="e7" value="deploy infra" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#C7131F;strokeWidth=2;fontSize=10;dashed=1;strokeDasharray=6 3;" edge="1" source="cdk_pipeline" target="vpc" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- ECS → SSM (read DB creds) -->
+    <mxCell id="e8" value="read DB creds" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#E7157B;strokeWidth=2;fontSize=10;dashed=1;strokeDasharray=6 3;" edge="1" source="ecs" target="ssm" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+  </root>
+</mxGraphModel>
